@@ -337,3 +337,9 @@ distributed under its own (MIT) license.
       url={https://arxiv.org/abs/2607.08168}, 
 }
 ```
+
+## Frontend Node.js runtime (2026-10-21)
+
+The Docker frontend builder and release workflow use Node.js 26.12.1. The Bookworm Slim builder image is pinned by digest. pnpm remains at the existing `web/package.json` version, 10.20.0, and is installed explicitly because Node.js 26 no longer bundles Corepack. Frozen lockfile installs, Python dependencies, model weights, and runtime behavior are unchanged.
+
+For frontend development, use Node.js 26.12.1 and `npm install --global pnpm@10.20.0`, then run `pnpm install --frozen-lockfile && pnpm run build` in `web/`. Node Runtime Check validates the TypeScript/Vite build and the Docker `web-builder` stage without publishing a package, starting the Python service, or downloading model weights.

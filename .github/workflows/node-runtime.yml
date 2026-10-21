@@ -1,0 +1,30 @@
+name: Node Runtime Check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, Node 24 action runtime
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0, Node 24 action runtime
+        with:
+          node-version: 26.12.1
+      - run: npm install --global pnpm@10.20.0
+      - name: Verify Node runtime
+        run: node -e "if (process.versions.node !== '26.12.1') process.exit(1)"
+      - run: pnpm install --frozen-lockfile
+        working-directory: web
+      - run: pnpm run build
+        working-directory: web
+      - name: Build only the frontend Docker stage
+        run: docker build --target web-builder --tag muscriptor-node-runtime .
+      - name: Verify builder Node runtime
+        run: docker run --rm --entrypoint node muscriptor-node-runtime -e "if (process.versions.node !== '26.12.1') process.exit(1)"

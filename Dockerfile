@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
-FROM node:22-bookworm-slim AS web-builder
+FROM node:26.12.1-bookworm-slim@sha256:b3dbaf0531ffedead011f14afc779688202fc975f89d2cebf2a63e8beed89e8a AS web-builder
 WORKDIR /web
 
 # pnpm is the project's package manager (pinned via package.json#packageManager).
-RUN corepack enable
+RUN npm install --global pnpm@10.20.0
 
 COPY web/package.json web/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
