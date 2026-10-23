@@ -343,3 +343,27 @@ distributed under its own (MIT) license.
 The Docker frontend builder and release workflow use Node.js 26.12.1. The Bookworm Slim builder image is pinned by digest. pnpm remains at the existing `web/package.json` version, 10.20.0, and is installed explicitly because Node.js 26 no longer bundles Corepack. Frozen lockfile installs, Python dependencies, model weights, and runtime behavior are unchanged.
 
 For frontend development, use Node.js 26.12.1 and `npm install --global pnpm@10.20.0`, then run `pnpm install --frozen-lockfile && pnpm run build` in `web/`. Node Runtime Check validates the TypeScript/Vite build and the Docker `web-builder` stage without publishing a package, starting the Python service, or downloading model weights.
+
+## Python TLS security update (2026-10-23)
+
+This fork's `uv.lock` pins certifi **2026.10.19** (previously 2026.5.20),
+addressing [GHSA-6q48-6c7w-9gw2](https://github.com/certifi/python-certifi/security/advisories/GHSA-6q48-6c7w-9gw2).
+The compromised emSign ECC Root CA - G3 is no longer trusted. Other dependencies,
+TLS verification settings, model weights, and Python runtime requirements are unchanged.
+Do not work around certificate errors by disabling verification or restoring the removed root.
+
+`Certifi Security Check` validates the lock, installs the hash-checked, lock-pinned
+Hugging Face/HTTPX dependency closure, exercises the real download utility without
+loading GPU/model code, checks the removed root's fingerprint, and performs direct
+certifi-verified HTTPS requests to PyPI and a small public MuScriptor assets README.
+No Hugging Face token or gated model download is needed. This focused check is not
+full model-inference, GPU, or installed-user-environment validation; the existing
+Node build checks remain in place.
+
+To apply this fork update to an existing checkout, obtain the updated `main`, run
+`uv sync --frozen`, then restart the application through your usual local procedure.
+Verify with `uv run --frozen python -c "import certifi; print(certifi.__version__, certifi.where())"`.
+A GitHub merge does not update existing environments or containers automatically.
+The inherited PyPI release workflow and Kyutai deployment scripts target upstream
+services, not a confirmed deployment of this fork; this update does not publish to
+those services. Rebuild any separately managed container from the updated checkout.
