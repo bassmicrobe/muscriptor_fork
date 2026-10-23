@@ -1,0 +1,31 @@
+name: Certifi Security Check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  python-tls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+        with:
+          version: '0.13.4'
+      - run: uv lock --check
+      - name: Install only the lock-pinned download dependency closure
+        run: |
+          python scripts/certifi_test_requirements.py > "$RUNNER_TEMP/tls-requirements.txt"
+          uv venv .tls-venv
+          uv pip sync --python .tls-venv/bin/python --require-hashes "$RUNNER_TEMP/tls-requirements.txt"
+          uv pip check --python .tls-venv/bin/python
+      - name: Verify Python download behavior, removed roots, and real HTTPS
+        run: .tls-venv/bin/python scripts/verify_certifi_tls.py --network
