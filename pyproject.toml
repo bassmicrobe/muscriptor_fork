@@ -23,6 +23,7 @@ classifiers = [
     "Topic :: Multimedia :: Sound/Audio :: Analysis",
 ]
 dependencies = [
+    "certifi>=2026.10.19",  # GHSA-6q48-6c7w-9gw2: compromised root removal
     # PyTorch stopped publishing Intel-mac (darwin x86_64) wheels after 2.2.2,
     # which only has wheels up to Python 3.12: on Intel macs pin torch (and
     # NumPy 1.x, which torch 2.2.2 was compiled against) and run under

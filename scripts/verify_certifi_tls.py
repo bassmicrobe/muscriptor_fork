@@ -35,6 +35,8 @@ class CertifiSecurityTests(unittest.TestCase):
         lock = tomllib.loads((ROOT / 'uv.lock').read_text())
         package = next(p for p in lock['package'] if p['name'] == 'certifi')
         self.assertEqual(certifi.__version__, package['version'])
+        manifest = tomllib.loads((ROOT / 'pyproject.toml').read_text())
+        self.assertIn('certifi>=2026.10.19', manifest['project']['dependencies'])
         self.assertGreaterEqual(tuple(map(int, certifi.__version__.split('.'))), (2026, 10, 19))
 
     def test_compromised_roots_not_trusted(self):

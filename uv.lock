@@ -538,6 +538,7 @@ name = "muscriptor"
 version = "0.2.2a1"
 source = { editable = "." }
 dependencies = [
+    { name = "certifi" },
     { name = "einops" },
     { name = "fastapi" },
     { name = "httpx" },
@@ -563,6 +564,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "certifi", specifier = ">=2026.10.19" },
     { name = "einops", specifier = ">=0.4" },
     { name = "fastapi", specifier = ">=0.136.3" },
     { name = "httpx", specifier = ">=0.28.1" },

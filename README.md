@@ -347,6 +347,7 @@ For frontend development, use Node.js 26.12.1 and `npm install --global pnpm@10.
 ## Python TLS security update (2026-10-23)
 
 This fork's `uv.lock` pins certifi **2026.10.19** (previously 2026.5.20),
+and adds a `certifi>=2026.10.19` dependency floor for source/pip installs,
 addressing [GHSA-6q48-6c7w-9gw2](https://github.com/certifi/python-certifi/security/advisories/GHSA-6q48-6c7w-9gw2).
 The compromised emSign ECC Root CA - G3 is no longer trusted. Other dependencies,
 TLS verification settings, model weights, and Python runtime requirements are unchanged.
