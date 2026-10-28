@@ -1,292 +1,165 @@
+# MuScriptor
+
+**Kyutai と Mirelo が開発した、マルチ楽器の音楽書き起こしモデルです。**
+
+## 概要
+
 <p align="center">
   <img src="web/logo_muscriptor_final.png" alt="MuScriptor logo" width="300">
 </p>
 
-# MuScriptor
+MuScriptor は [Kyutai](https://kyutai.org) と [Mirelo](https://www.mirelo.ai) が開発したマルチ楽器の音楽書き起こしモデルです。クラシックからヘビーメタルまで約 17 万曲の大規模データセットで学習した、初の音楽書き起こしモデルです。アーキテクチャは Transformer デコーダのみです。
 
-MuScriptor is a multi-instrument music transcription model developed by [Kyutai](https://kyutai.org) and [Mirelo](https://www.mirelo.ai).
-MuScriptor is the first music transcription model that has been trained on a large scale dataset of 170k songs from classical music to heavy metal.
+[オンラインデモ](https://muscriptor.kyutai.org) | [論文](https://arxiv.org/abs/2607.08168v1) | [HuggingFace](https://huggingface.co/MuScriptor)
 
-[Online Demo](https://muscriptor.kyutai.org) | [Paper](https://arxiv.org/abs/2607.08168v1) | [HuggingFace](https://huggingface.co/MuScriptor)
+3 つのバリアントが [MuScriptor](https://huggingface.co/MuScriptor) 組織配下に公開されています。`load_model()`、CLI の `--model`、`serve --model` ではサイズ名を渡すだけで、重みがダウンロードされローカルにキャッシュされます。
 
-<!-- TODO: record the demo GIF (web UI piano roll), save it as assets/demo.gif,
-     then uncomment:
-<p align="center">
-  <img src="assets/demo.gif" alt="MuScriptor web UI: live piano roll while transcribing" width="700">
-</p>
--->
+| バリアント | パラメータ数 | レイヤ | Dim | HuggingFace |
+|---|---|---|---|---|
+| `small` | 103M | 14 | 768 | [muscriptor-small](https://huggingface.co/MuScriptor/muscriptor-small) |
+| `medium`（既定） | 307M | 24 | 1024 | [muscriptor-medium](https://huggingface.co/MuScriptor/muscriptor-medium) |
+| `large` | 1.4B | 48 | 1536 | [muscriptor-large](https://huggingface.co/MuScriptor/muscriptor-large) |
 
-## HuggingFace login (required)
+CPU のみなら `small`、速度と精度のバランスは `medium`、精度最優先（GPU 推奨）は `large` です。
 
-The model weights are hosted on [HuggingFace](https://huggingface.co/MuScriptor)
-and gated behind their CC BY-NC 4.0 license, so downloading them — including
-on the first `uvx muscriptor` run — requires a (free) HuggingFace account:
+## 技術スタック
 
-1. Accept the model license on the model page, e.g.
-   [muscriptor-medium](https://huggingface.co/MuScriptor/muscriptor-medium)
-   (access is granted automatically).
-2. Authenticate on your machine:
+- **Python** 3.10 以上（このリポジトリの `.python-version` は 3.13。Intel Mac は 3.10–3.12）
+- **パッケージ管理**: uv、[Typer](https://typer.tiangolo.com/) CLI
+- **モデル / 推論**: PyTorch、safetensors、Hugging Face Hub、einops、soundfile、mido
+- **サーバー**: FastAPI、Uvicorn（`POST /transcribe` は SSE）
+- **フロントエンド**（`web/`）: React、TypeScript、Vite、Tailwind CSS、pnpm 10.20.0、Node.js 26.12.1、[SpessaSynth](https://github.com/spessasus/spessasynth_lib)
+- **その他**: Docker（`Dockerfile`）、auralize 用 fluidsynth、pytest、pre-commit（Ruff / uv-lock）
 
-   ```bash
-   uvx hf auth login
-   ```
+## セットアップ
 
-   or set a token (create one at
-   [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)):
+### HuggingFace ログイン（必須）
 
-   ```bash
-   export HF_TOKEN=hf_...
-   ```
+モデル重みは [HuggingFace](https://huggingface.co/MuScriptor) にあり、CC BY-NC 4.0 のゲート付きです。初回の `uvx muscriptor` を含むダウンロードには、無料の HuggingFace アカウントが必要です。
 
-The weights are then downloaded on first use and cached locally.
-
-## Try it locally
-
-You can try it locally with the web UI with:
+1. モデルページでライセンスに同意する（例: [muscriptor-medium](https://huggingface.co/MuScriptor/muscriptor-medium)）。アクセスは自動で付与されます。
+2. マシンで認証する:
 
 ```bash
-uvx muscriptor serve
+uvx hf auth login
 ```
 
-or with the CLI:
+または [トークン](https://huggingface.co/settings/tokens) を設定する:
 
 ```bash
-uvx muscriptor transcribe
-```  
+export HF_TOKEN=hf_...
+```
 
-> **Intel Macs:** PyTorch stopped shipping Intel-mac (x86_64) wheels after
-> torch 2.2.2, which supports Python ≤ 3.12, so you must tell uvx to use
-> Python 3.12:
->
-> ```bash
-> uvx --python 3.12 muscriptor serve
-> ```
->
-> If you install with pip/uv instead, use Python 3.10–3.12.
+重みは初回利用時にダウンロードされ、ローカルにキャッシュされます。
 
+### インストール
 
-## Installation
-
-with uv (recommended):
+uv（推奨）:
 
 ```bash
 uv add muscriptor
 ```
 
+pip:
+
 ```bash
 pip install muscriptor
 ```
 
-## Models
+> **Intel Mac:** PyTorch は torch 2.2.2 以降 Intel Mac（x86_64）向けホイールを出していません。このバージョンは Python ≤ 3.12 です。`uvx` では Python 3.12 を指定してください。
+>
+> ```bash
+> uvx --python 3.12 muscriptor serve
+> ```
+>
+> pip / uv で入れる場合も Python 3.10–3.12 を使います。
 
-Three variants are published under the [MuScriptor](https://huggingface.co/MuScriptor)
-HuggingFace organization. Everywhere a model is selected (`load_model()`, the
-CLI's `--model`, `serve --model`) you can pass the bare size keyword and the
-weights are downloaded and cached automatically. The architecture is a transformer decoder only. Here are the detailed model sizes:
-
-| Variant | Parameters | Layers | Dim | HuggingFace repo |
-|---|---|---|---|---|
-| `small` | 103M | 14 | 768 | [muscriptor-small](https://huggingface.co/MuScriptor/muscriptor-small) |
-| `medium` (default) | 307M | 24 | 1024 | [muscriptor-medium](https://huggingface.co/MuScriptor/muscriptor-medium) |
-| `large` | 1.4B | 48 | 1536 | [muscriptor-large](https://huggingface.co/MuScriptor/muscriptor-large) |
-
-`small` is the practical choice on CPU-only machines, `medium` is the default
-speed/accuracy trade-off, and `large` is the most accurate but really wants a
-GPU. 
-## Usage
-
-```python
-from pathlib import Path
-from muscriptor import TranscriptionModel
-
-# Downloads the default "medium" variant from HuggingFace (cached under
-# ~/.cache/muscriptor/). Also accepts "small"/"large", a local safetensors
-# path, or an hf:// / http(s):// URL.
-model = TranscriptionModel.load_model()
-
-# Stream events as they're transcribed. Optionally tell the model which
-# instruments to expect — run `muscriptor list-instruments` for the names.
-for event in model.transcribe("audio.wav", instruments=["acoustic_piano", "drums"]):
-    print(event)
-
-# Or get a MIDI file directly
-midi_bytes = model.transcribe_to_midi("audio.wav")
-Path("out.mid").write_bytes(midi_bytes)
-```
-
-```python
-from dataclasses import dataclass
-from typing import Generator
-
-
-@dataclass
-class NoteStartEvent:
-    pitch: int
-    # Start of the note in seconds, from the beginning of the audio.
-    start_time: float
-    # A unique index for this note, used to match the corresponding
-    # NoteEndEvent.
-    index: int
-    instrument: str
-
-
-@dataclass
-class NoteEndEvent:
-    end_time: float
-    # The NoteStartEvent this end matches. Convenient for consumers —
-    # when serializing (e.g. to JSON) drop this field and rely on
-    # `start_event_index` to refer back to the start by id.
-    start_event: NoteStartEvent
-
-    @property
-    def start_event_index(self) -> int:
-        return self.start_event.index
-
-
-@dataclass
-class ProgressEvent:
-    # A coarse progress anchor woven into the event stream: `completed` of
-    # `total` 5-second chunks have been transcribed. One is emitted up front
-    # with completed == 0 (so consumers learn `total`), then one per finished
-    # chunk. Advisory only — consumers that just build notes can ignore them.
-    completed: int
-    total: int
-
-
-class TranscriptionModel:
-    ...
-    def transcribe(
-            self,
-            audio: str | Path | tuple[torch.Tensor, int],
-            use_sampling: bool = False,
-            temperature: float = 1.0,
-            cfg_coef: float = 1.0,
-            instruments: list[str] | None = None,
-            batch_size: int | None = None,
-            no_eos_is_ok: bool = True,
-            beam_size: int = 1,
-        ) -> Generator[NoteStartEvent | NoteEndEvent | ProgressEvent, None, None]:
-        """Transcribe audio into a stream of note events.
-
-        Args:
-            audio: Path to an audio file, or a tuple `(tensor, sample_rate)`
-                with a float tensor of shape [T] or [1, T] at `sample_rate`
-                Hz. The tuple form is useful when the audio is already
-                loaded in memory.
-            use_sampling: Use temperature sampling instead of greedy decoding.
-            temperature: Sampling temperature (only used when use_sampling=True).
-            cfg_coef: Classifier-free guidance coefficient. Keep to 1 for the released models (they are post-RL)
-            instruments: Optional list of instrument group names to
-                condition the model on (exact names, e.g.
-                ["acoustic_piano", "drums"]). Run `muscriptor
-                list-instruments` (or GET /instruments on the server)
-                for the full list of valid names.
-            batch_size: Number of 5-second chunks processed per forward
-                pass. `None` (default) picks a value based on the device:
-                1 on CPU, 4 on GPU. Use `batch_size=1` for the lowest
-                streaming latency — larger batches process several chunks
-                together, so events belonging to later chunks of a batch
-                won't arrive until the whole batch finishes. Within a
-                batch, events are always yielded in temporal order; all
-                events from chunk N are emitted before any event from
-                chunk N+1.
-            no_eos_is_ok: If True, a chunk that doesn't emit EOS within
-                the generation budget produces a warning instead of raising.
-            beam_size: Beam search width. 1 (default) uses greedy decoding
-                (or sampling, with use_sampling=True); >= 2 enables beam
-                search, which is slower but can be more accurate.
-
-        Returns:
-            Generator of NoteStartEvent, NoteEndEvent and ProgressEvent
-            objects. Every
-            NoteStartEvent is guaranteed to be followed by exactly one
-            matching NoteEndEvent later in the stream (with the same
-            `index`). Drum hits appear as a NoteStartEvent immediately
-            followed by its matching NoteEndEvent at the same start time
-            plus a tiny duration. Note: this tokenizer does not preserve
-            velocity (loudness) — only onset/offset timing, pitch, and
-            instrument are recovered.
-        """
-
-    def transcribe_to_midi(
-            self,
-            audio: str | Path | tuple[torch.Tensor, int],
-            use_sampling: bool = False,
-            temperature: float = 1.0,
-            cfg_coef: float = 1.0,
-            instruments: list[str] | None = None,
-            batch_size: int | None = None,
-            no_eos_is_ok: bool = True,
-            beam_size: int = 1,
-        ) -> bytes:
-        """Same as `transcribe`, but returns a MIDI file as bytes instead
-        of a generator of events. Useful when you want to save the MIDI
-        to disk or send it over a network without going through the
-        event stream.
-        """
-```
-
-
-## CLI
-
-```bash
-# Transcribe to MIDI (defaults to <audio_file>.mid next to the input)
-muscriptor transcribe audio.wav -o out.mid
-
-# Pick a model variant: small / medium / large (default: medium),
-# a local safetensors path, or an hf:// / http(s):// URL
-muscriptor transcribe audio.wav --model large
-
-# Tell the model which instruments to expect (comma-separated names;
-# run `muscriptor list-instruments` for the full list). Case-insensitive,
-# and unambiguous abbreviations work: 'timp,dist' = timpani + distorted
-# electric guitar
-muscriptor transcribe audio.wav --instruments acoustic_piano,drums
-
-# Get the event stream instead of MIDI: json (single array) or
-# jsonl (one event per line, streamed while transcribing); -o - = stdout
-muscriptor transcribe audio.wav --format jsonl -o -
-
-# Decoding options: temperature sampling, or beam search (slower, can be
-# more accurate)
-muscriptor transcribe audio.wav --sampling -t 0.8
-muscriptor transcribe audio.wav --beam-size 4
-
-# Render a stereo check-mix of the result (left channel = original audio,
-# right channel = synthesized MIDI; requires fluidsynth on PATH)
-muscriptor transcribe audio.wav -o out.mid --auralize check.wav
-```
-
-See `muscriptor transcribe --help` for the full list of options.
-
-## Web UI
-
-A browser client is included under `web/`. The FastAPI server serves both
-the UI and a POST `/transcribe` endpoint that streams `NoteStart`/`NoteEnd`
-events back as Server-Sent Events. The UI accepts an audio file (WAV, or any
-format soundfile/libsndfile can read — mp3, flac, ogg, m4a, …) via drag-and-drop,
-renders a live piano roll while events arrive, auto-plays once enough notes
-are available, and crossfades between the original WAV and the synthesized
-MIDI playback.
-
-### One-time setup
+### Web UI のビルド（ソースから動かす場合）
 
 ```bash
 uv sync
 cd web && pnpm install && pnpm run build && cd ..
 ```
 
-`pnpm run build` is required once — it outputs to `muscriptor/web_dist/`,
-which the FastAPI server auto-mounts if it exists (and which ships inside
-the PyPI wheel, so `uvx muscriptor serve` works without a checkout).
+`pnpm run build` は一度必要です。出力先は `muscriptor/web_dist/` で、存在すれば FastAPI が自動マウントします。PyPI の wheel にも同梱されるため、`uvx muscriptor serve` はチェックアウトなしで動きます。
 
-The soundfonts are not bundled: the server fetches
-`MuseScore_General.sf2` (215 MB, used by `/auralize`) and
-`MuseScore_General.sf3` (38 MB, the compressed build the UI plays) from
-[MuScriptor/assets](https://huggingface.co/MuScriptor/assets) on first use
-and caches them locally (see `muscriptor/soundfonts.py`).
+開発時の Node.js は 26.12.1、pnpm は 10.20.0 です（[docs/frontend-nodejs-runtime.md](docs/frontend-nodejs-runtime.md)）。
 
-### Run
+サウンドフォントは同梱しません。サーバーは初回利用時に [MuScriptor/assets](https://huggingface.co/MuScriptor/assets) から `MuseScore_General.sf2`（215 MB、`/auralize` 用）と `MuseScore_General.sf3`（38 MB、UI 再生用）を取得し、ローカルにキャッシュします（`muscriptor/soundfonts.py`）。
+
+## 使い方
+
+チェックアウトなしで試す場合:
+
+```bash
+uvx muscriptor serve
+```
+
+CLI:
+
+```bash
+uvx muscriptor transcribe
+```
+
+### Python API
+
+```python
+from pathlib import Path
+from muscriptor import TranscriptionModel
+
+# 既定の "medium" を HuggingFace から取得（~/.cache/muscriptor/ にキャッシュ）。
+# "small" / "large"、ローカルの safetensors、hf:// や http(s):// も可。
+model = TranscriptionModel.load_model()
+
+# イベントをストリームする。楽器は任意指定。名前は `muscriptor list-instruments`。
+for event in model.transcribe("audio.wav", instruments=["acoustic_piano", "drums"]):
+    print(event)
+
+# MIDI バイト列として取得
+midi_bytes = model.transcribe_to_midi("audio.wav")
+Path("out.mid").write_bytes(midi_bytes)
+```
+
+`transcribe()` は `NoteStartEvent` / `NoteEndEvent` / `ProgressEvent` のジェネレータです。各 `NoteStartEvent` には同じ `index` の `NoteEndEvent` が後続します。ドラムは開始直後にごく短い長さの終了イベントが続きます。ベロシティ（音量）は復元しません。オンセット / オフセット、ピッチ、楽器のみです。
+
+主な引数:
+
+- `audio`: ファイルパス、または `(tensor, sample_rate)`（形状 `[T]` または `[1, T]`）
+- `instruments`: 楽器グループ名のリスト（正式名。一覧は `muscriptor list-instruments` または `GET /instruments`）
+- `batch_size`: 5 秒チャンクのバッチ。`None` なら CPU で 1、GPU で 4。ストリーミング遅延を抑えるなら `1`
+- `use_sampling` / `temperature` / `beam_size`: サンプリングまたはビームサーチ（既定の `beam_size=1` は greedy）
+- `cfg_coef`: Classifier-free guidance。公開モデルは post-RL のため `1` のまま
+- `no_eos_is_ok`: 生成予算内に EOS が出ないチャンクを警告にする（`True` が既定）
+
+### CLI
+
+```bash
+# MIDI へ書き起こし（既定は入力と同じ場所の <audio_file>.mid）
+muscriptor transcribe audio.wav -o out.mid
+
+# モデル: small / medium / large（既定: medium）、ローカル safetensors、hf:// / http(s)://
+muscriptor transcribe audio.wav --model large
+
+# 想定楽器（カンマ区切り。正式名は `muscriptor list-instruments`）。
+# 大文字小文字は無視。曖昧でなければ省略可: 'timp,dist' = timpani + distorted electric guitar
+muscriptor transcribe audio.wav --instruments acoustic_piano,drums
+
+# イベント列: json（配列）または jsonl（1 行 1 イベント、-o - は stdout）
+muscriptor transcribe audio.wav --format jsonl -o -
+
+# 温度サンプリング、またはビームサーチ
+muscriptor transcribe audio.wav --sampling -t 0.8
+muscriptor transcribe audio.wav --beam-size 4
+
+# ステレオの確認ミックス（L=元音源、R=合成 MIDI。PATH 上に fluidsynth が必要）
+muscriptor transcribe audio.wav -o out.mid --auralize check.wav
+```
+
+全オプションは `muscriptor transcribe --help` を参照してください。
+
+### Web UI
+
+`web/` にブラウザクライアントがあります。FastAPI は UI と、`NoteStart` / `NoteEnd` を Server-Sent Events で返す `POST /transcribe` を提供します。WAV のほか、soundfile / libsndfile が読める形式（mp3、flac、ogg、m4a など）をドラッグ & ドロップできます。イベント到着中にピアノロールを描画し、十分なノートが揃うと自動再生し、元 WAV と合成 MIDI をクロスフェードします。
 
 ```bash
 uv run muscriptor serve \
@@ -296,75 +169,56 @@ uv run muscriptor serve \
     --port 8222
 ```
 
-`--model` accepts a size keyword (`small`, `medium`, `large`) that downloads
-the matching variant from HuggingFace (cached under `~/.cache/muscriptor/`),
-a local safetensors path, or an `hf://` / `http(s)://` URL. It defaults to
-`medium` when omitted.
+`--model` はサイズ名（`small` / `medium` / `large`）、ローカル safetensors、`hf://` / `http(s)://` を受け付けます。省略時は `medium`。重みは `~/.cache/muscriptor/` にキャッシュされます。
 
-Then open <http://127.0.0.1:8222/> (or the LAN address of the host) and drop
-a WAV onto the page.
+<http://127.0.0.1:8222/>（またはホストの LAN アドレス）を開き、WAV をドロップします。
 
-- Drop `--device cuda` if running CPU-only.
-- `--host 0.0.0.0` makes it reachable on the LAN; the default `127.0.0.1`
-  is local-only.
-- Playback runs a full SoundFont synthesizer ([SpessaSynth](https://github.com/spessasus/spessasynth_lib))
-  in the browser, fed with `MuseScore_General.sf3` — the same soundfont the
-  `/auralize` endpoint uses, served by the app itself from `/soundfonts/`
-  (cached server-side), no third-party CDN.
+- CPU のみなら `--device cuda` を外す
+- `--host 0.0.0.0` で LAN 公開。既定の `127.0.0.1` はローカルのみ
+- 再生はブラウザ内の SoundFont シンセ（[SpessaSynth](https://github.com/spessasus/spessasynth_lib)）で、`MuseScore_General.sf3` を使う。`/auralize` と同じサウンドフォントをアプリが `/soundfonts/` から配信する（サーバー側キャッシュ、第三者 CDN なし）
 
-## License
+## 構成
 
-The code in this repository is released under the [MIT license](LICENSE).
+```
+.
+├── muscriptor/       # Python パッケージ（モデル・CLI・FastAPI）
+│   ├── models/
+│   ├── modules/
+│   ├── tokenizer/
+│   └── utils/
+├── web/              # Web UI（React / Vite）。ビルド先は muscriptor/web_dist/
+├── tests/            # pytest
+├── scripts/          # TLS 検証などの補助スクリプト
+├── docs/             # 補足ドキュメント
+├── Dockerfile
+├── swarm.yml         # Docker Swarm デプロイ定義
+├── deploy.sh
+└── pyproject.toml
+```
 
-The model weights, published on
-[HuggingFace](https://huggingface.co/MuScriptor), are released under the
-[CC BY-NC 4.0 license](https://creativecommons.org/licenses/by-nc/4.0/)
-(non-commercial use).
+## ドキュメント
 
-The MuseScore General SoundFont downloaded for playback / auralization is
-distributed under its own (MIT) license.
+- [フロントエンド Node.js ランタイム](docs/frontend-nodejs-runtime.md)
+- [Python TLS セキュリティ更新](docs/python-tls-security.md)
 
-## Citation
+## ライセンス
+
+このリポジトリのコードは [MIT license](LICENSE) です。
+
+[HuggingFace](https://huggingface.co/MuScriptor) のモデル重みは [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)（非商用）です。
+
+再生 / auralization 用にダウンロードする MuseScore General SoundFont は、それ自体の MIT ライセンスです。
+
+## 引用
 
 ```bibtex
 @misc{rouard2026muscriptoropenmodelmultiinstrument,
-      title={MuScriptor: An Open Model for Multi-Instrument Music Transcription}, 
+      title={MuScriptor: An Open Model for Multi-Instrument Music Transcription},
       author={Simon Rouard and Michael Krause and Axel Roebel and Carl-Johann Simon-Gabriel and Alexandre Défossez},
       year={2026},
       eprint={2607.08168},
       archivePrefix={arXiv},
       primaryClass={cs.SD},
-      url={https://arxiv.org/abs/2607.08168}, 
+      url={https://arxiv.org/abs/2607.08168},
 }
 ```
-
-## Frontend Node.js runtime (2026-10-21)
-
-The Docker frontend builder and release workflow use Node.js 26.12.1. The Bookworm Slim builder image is pinned by digest. pnpm remains at the existing `web/package.json` version, 10.20.0, and is installed explicitly because Node.js 26 no longer bundles Corepack. Frozen lockfile installs, Python dependencies, model weights, and runtime behavior are unchanged.
-
-For frontend development, use Node.js 26.12.1 and `npm install --global pnpm@10.20.0`, then run `pnpm install --frozen-lockfile && pnpm run build` in `web/`. Node Runtime Check validates the TypeScript/Vite build and the Docker `web-builder` stage without publishing a package, starting the Python service, or downloading model weights.
-
-## Python TLS security update (2026-10-23)
-
-This fork's `uv.lock` pins certifi **2026.10.19** (previously 2026.5.20),
-and adds a `certifi>=2026.10.19` dependency floor for source/pip installs,
-addressing [GHSA-6q48-6c7w-9gw2](https://github.com/certifi/python-certifi/security/advisories/GHSA-6q48-6c7w-9gw2).
-The compromised emSign ECC Root CA - G3 is no longer trusted. Other dependencies,
-TLS verification settings, model weights, and Python runtime requirements are unchanged.
-Do not work around certificate errors by disabling verification or restoring the removed root.
-
-`Certifi Security Check` validates the lock, installs the hash-checked, lock-pinned
-Hugging Face/HTTPX dependency closure, exercises the real download utility without
-loading GPU/model code, checks the removed root's fingerprint, and performs direct
-certifi-verified HTTPS requests to PyPI and a small public MuScriptor assets README.
-No Hugging Face token or gated model download is needed. This focused check is not
-full model-inference, GPU, or installed-user-environment validation; the existing
-Node build checks remain in place.
-
-To apply this fork update to an existing checkout, obtain the updated `main`, run
-`uv sync --frozen`, then restart the application through your usual local procedure.
-Verify with `uv run --frozen python -c "import certifi; print(certifi.__version__, certifi.where())"`.
-A GitHub merge does not update existing environments or containers automatically.
-The inherited PyPI release workflow and Kyutai deployment scripts target upstream
-services, not a confirmed deployment of this fork; this update does not publish to
-those services. Rebuild any separately managed container from the updated checkout.
